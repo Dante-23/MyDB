@@ -17,8 +17,9 @@ using namespace std;
 
 extern int errno;
 
+// takes a name as input and makes a file
+// used to create to .schema .meta and .db files when first initializing a database
 int create_file(char* name){
-    // int fd = open(name, O_CREAT);
     int fd = creat(name, 0777);
     if(fd == -1){
         cout << "unable to create" << endl;
@@ -31,6 +32,15 @@ int create_file(char* name){
     }
 }
 
+/**
+ * After creating .meta file, it is initialized
+ * meta file contains five information as of now
+ * Last tuple address = address to insert new row
+ * Database size
+ * Number of tuples in database
+ * Tuple size
+ * Database name
+ **/
 int Initialize_Meta_File(char* name, string dbname){
     int fd = open(name, O_WRONLY);
     int offset = 0, nor = 0;
@@ -133,6 +143,11 @@ string Read_DatabaseName(char* name){
     return buffer;
 }
 
+/**
+ * Schema file contains contains schema details in pair
+ * First = name of attribute
+ * Second = Data type of attribute
+ **/
 int Write_In_Schema_File(char* name, vector<pair<string,string>> schema){
     int fd = open(name, O_WRONLY);
     char* attr = (char*) malloc(SCHEMA_ATTRIBUTE_SIZE * sizeof(char));
@@ -269,167 +284,6 @@ int Delete_Data_Tuple(char* name, char* meta, vector<pair<string,string>> schema
     return 1;
 }
 
-// int Update_Data_Tuple(char* name, )
-
-void f(){
-    char* schname = (char*) malloc(STRING * sizeof(char));
-    strcpy(schname, "test.schema");
-    create_file(schname);
-    string query;
-    getline(cin, query);
-    vector<pair<string,string>> schema = parse_schema_DDL(query);
-    Write_In_Schema_File(schname, schema);
-    strcpy(schname, "test.meta");
-    create_file(schname);
-    Initialize_Meta_File(schname, getDatabaseName(query));
-    strcpy(schname, "test.db");
-    create_file(schname);
-
-    // string str, temp = "fa";
-    // str.assign(temp);
-    // cout << str << endl;
-    // char* fname = (char*) malloc(STRING * sizeof(char));
-    // strcpy(fname, "test.schema");
-    // // cout << "here" << endl;
-    // vector<pair<string,string>> schema = Read_Schema_File(fname);
-    // cout << "schema: " << endl;
-    // for(pair<string,string> p: schema) cout << p.first << " " << p.second << endl;
-    // strcpy(fname, "test.db");
-    // char* schname = (char*) malloc(STRING * sizeof(char));
-    // strcpy(schname, "test.meta");
-    // cout << "before" << endl;
-    // cout << Read_Last_Tuple_Address(schname) << endl;
-    // cout << Read_Database_Size(schname) << endl;
-    // cout << Read_Num_Tuples(schname) << endl;
-    // int size, i = 0;
-    // cout << "enter number of tuples: ";
-    // cin >> size;
-    // while(i < size){
-    //     cout << "Enter tuple: " << endl;
-    //     string name;
-    //     int roll, bo;
-    //     bool b = false;
-    //     cin >> name >> roll >> bo;
-    //     if(bo) b = true;
-    //     vector<AttributeNode*> tuple(3);
-    //     cout << "here" << endl;
-    //     tuple[0] = getAttributeNode(1, false, name, 2);
-    //     cout << "here" << endl;
-    //     tuple[1] = getAttributeNode(roll, false, "", 0);
-    //     cout << "here" << endl;
-    //     tuple[2] = getAttributeNode(1, b, "", 1);
-    //     cout << "here" << endl;
-    //     Write_In_Data_File(fname, schname, tuple, STRING + INTEGER + BOOL);
-    //     for(int j = 0; j < 3; j++){
-    //         if(tuple[j]->index == 2) free(tuple[j]->str);
-    //         free(tuple[j]);
-    //     }
-    //     i++;
-    // }
-    strcpy(schname, "test.meta");
-    cout << "after" << endl;
-    cout << Read_Last_Tuple_Address(schname) << endl;
-    cout << Read_Database_Size(schname) << endl;
-    cout << Read_Num_Tuples(schname) << endl;
-    cout << Read_DatabaseName(schname) << endl;
-}
-
-void g(){
-    char* name = (char*) malloc(STRING * sizeof(char));
-    strcpy(name, "test.db");
-    char* sch = (char*) malloc(STRING * sizeof(char));
-    strcpy(sch, "test.schema");
-    vector<pair<string,string>> schema = Read_Schema_File(sch);
-    cout << "schema" << endl;
-    for(pair<string,string> p: schema){
-        cout << p.first << " " << p.second << endl;
-    }
-    int ts = STRING + INTEGER + BOOL;
-    strcpy(sch, "test.meta");
-    Delete_Data_Tuple(name, sch, schema, 1, STRING + INTEGER + BOOL);
-    int size = Read_Num_Tuples(sch);
-    for(int i = 0; i < size; i++){
-        vector<AttributeNode*> tuple = Read_Data_File(name, schema, i, ts);
-        for(AttributeNode* node: tuple){
-            if(node->index == 0) cout << node->num << " ";
-            else if(node->index == 1) cout << node->b << " ";
-            else cout << node->str << " ";
-        }
-        cout << endl;
-    }
-}
-
 int main(){
-    while(1){
-        cout << "enter: ";
-        string query;
-        getline(cin, query);
-        if(query[0] == '1'){
-            int sp = query.find(' ');
-            query = query.substr(sp + 1, query.size() - sp);
-            vector<pair<string,string>> schema = parse_schema_DDL(query);
-            string dbname = getDatabaseName(query);
-            char* name = (char*) malloc(STRING * sizeof(char));
-            strcpy(name, (dbname + ".schema").c_str());
-            create_file(name);
-            Write_In_Schema_File(name, schema);
-            strcpy(name, (dbname + ".meta").c_str());
-            create_file(name);
-            Initialize_Meta_File(name, dbname);
-            strcpy(name, (dbname + ".db").c_str());
-            create_file(name);
-            free(name);
-        }
-        else if(query[0] == '2'){
-            int sp = query.find(' ') + 1;
-            string dbname = query.substr(sp, query.find(' ', sp) - sp);
-            char* name = (char*) malloc(STRING * sizeof(char));
-            char* meta = (char*) malloc(STRING * sizeof(char));
-            strcpy(name, (dbname + ".schema").c_str());
-            vector<AttributeNode*> tuple = getTuple(Read_Schema_File(name), query.substr(query.find(' ', sp) + 1, query.size() - query.find(' ', sp)));
-            int tupleSize = getTupleSize(Read_Schema_File(name));
-            strcpy(name, (dbname + ".db").c_str());
-            strcpy(meta, (dbname + ".meta").c_str());
-            Write_In_Data_File(name, meta, tuple, tupleSize);
-            free(name);
-            free(meta);
-        }
-        else if(query[0] == '3'){
-            char* name = (char*) malloc(STRING * sizeof(char));
-            char* meta = (char*) malloc(STRING * sizeof(char));
-            string dbname = query.substr(query.find(' ') + 1, query.size() - query.find(' '));
-            strcpy(meta, (dbname + ".meta").c_str());
-            strcpy(name, (dbname + ".db").c_str());
-            int size = Read_Num_Tuples(meta);
-            strcpy(meta, (dbname + ".schema").c_str());
-            vector<pair<string,string>> schema = Read_Schema_File(meta);
-            for(int i = 0; i < size; i++){
-                vector<AttributeNode*> tuple = Read_Data_File(name, schema, i, getTupleSize(schema));
-                for(AttributeNode* node: tuple){
-                    if(node->index == 0) cout << node->num << " ";
-                    else if(node->index == 1) cout << node->b << " ";
-                    else cout << node->str << " ";
-                }
-                cout << endl;
-            }
-            free(name);
-            free(meta);
-        }
-        else if(query[0] == '4'){
-            string dbname = query.substr(query.find(' ') + 1, query.size() - query.find(' '));
-            char* meta = (char*) malloc(STRING * sizeof(char));
-            strcpy(meta, (dbname + ".meta").c_str());
-            cout << Read_Last_Tuple_Address(meta) << endl;
-            cout << Read_Database_Size(meta) << endl;
-            cout << Read_Num_Tuples(meta) << endl;
-            strcpy(meta, (dbname + ".schema").c_str());
-            vector<pair<string,string>> schema = Read_Schema_File(meta);
-            for(pair<string,string> p: schema){
-                cout << p.first << " " << p.second << endl;
-            }
-        }
-        else{
 
-        }
-    }
 }
