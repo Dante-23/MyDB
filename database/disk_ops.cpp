@@ -15,7 +15,7 @@ using namespace std;
 #define META_NUM_TUPLES 4
 #define META_TUPLE_SIZE 4
 
-#define INTEGER 8
+#define INTEGER 4
 #define BOOL 1
 #define STRING 32
 
@@ -24,20 +24,19 @@ extern int errno;
 struct AttributeNode{
     int num;
     bool b;
-    string str;
+    char* str;
     int index;
 };
 
 AttributeNode* getAttributeNode(int num, bool b, string str, int index){
-    cout << "in" << endl;
     AttributeNode* node = (AttributeNode*) malloc(sizeof(AttributeNode));
-    cout << "in" << endl;
+    node->str = (char*) malloc(STRING * sizeof(char));
     node->index = index;
-    cout << "in" << endl;
     if(index == 0) node->num = num;
     else if(index == 1) node->b = b;
-    else node->str.assign(str);
-    cout << "in" << endl;
+    else{
+        strcpy(node->str, str.c_str());
+    }
     return node;
 }
 
@@ -188,7 +187,6 @@ vector<pair<string,string>> Read_Schema_File(char* name){
 int Write_In_Data_File(char* name, char* meta, vector<AttributeNode*> tuple, int tuplesize){
     int last_address = Read_Last_Tuple_Address(meta);
     int fd = open(name, O_WRONLY), offset = last_address;
-    char* temp = (char*) malloc(STRING * sizeof(char));
     for(AttributeNode* node: tuple){
         lseek(fd, offset, SEEK_SET);
         ssize_t bytes;
@@ -201,12 +199,11 @@ int Write_In_Data_File(char* name, char* meta, vector<AttributeNode*> tuple, int
             offset += BOOL;
         }
         else{
-            strcpy(temp, node->str.c_str());
-            bytes = write(fd, (void*)temp, STRING);
+            bytes = write(fd, (void*)node->str, STRING);
             offset += STRING;
         }
     }
-    free(temp);
+    // free(temp);
     close(fd);
     Update_Last_Tuple_Address(meta, last_address + tuplesize);
     Update_Database_Size(meta, Read_Database_Size(meta) + tuplesize);
@@ -214,8 +211,30 @@ int Write_In_Data_File(char* name, char* meta, vector<AttributeNode*> tuple, int
     return 1;
 }
 
+int Write_At_Location(char* name, vector<AttributeNode*> tuple, int tupleNum, int tupleSize){
+    int fd = open(name, O_WRONLY);
+    int offset = tupleNum * tupleSize;
+    for(AttributeNode* node: tuple){
+        lseek(fd, offset, SEEK_SET);
+        ssize_t bytes;
+        if(node->index == 0){
+            bytes = write(fd, (void*)&node->num, INTEGER);
+            offset += INTEGER;
+        }
+        else if(node->index == 1){
+            bytes = write(fd, (void*)&node->b, BOOL);
+            offset += BOOL;
+        }
+        else{
+            bytes = write(fd, (void*)node->str, STRING);
+            offset += STRING;
+        }
+    }
+    return 1;
+}
+
 vector<AttributeNode*> Read_Data_File(char* name, vector<pair<string,string>> schema, int tupleNum, int tuplesize){
-    vector<AttributeNode*> tuple(tuplesize);
+    vector<AttributeNode*> tuple((int)schema.size());
     int index = 0, offset = tupleNum * tuplesize;
     int fd = open(name, O_RDONLY);
     void* num = malloc(INTEGER), *b = malloc(BOOL);
@@ -231,9 +250,7 @@ vector<AttributeNode*> Read_Data_File(char* name, vector<pair<string,string>> sc
         }
         else if(sch.second == TYPE2){
             read(fd, (void*)temp, STRING);
-            string str;
-            copy(str.begin(), str.end(), temp);
-            tuple[index++] = getAttributeNode(1, false, str, 2);
+            tuple[index++] = getAttributeNode(1, false, temp, 2);
             offset += STRING;
         }
         else{
@@ -249,6 +266,17 @@ vector<AttributeNode*> Read_Data_File(char* name, vector<pair<string,string>> sc
     free(temp);
     return tuple;
 }
+
+int Delete_Data_Tuple(char* name, char* meta, vector<pair<string,string>> schema, int tupleNum, int tupleSize){
+    vector<AttributeNode*> tuple = Read_Data_File(name, schema, Read_Num_Tuples(meta) - 1, tupleSize);
+    Write_At_Location(name, tuple, tupleNum, tupleSize);
+    Update_Last_Tuple_Address(meta, Read_Last_Tuple_Address(meta) - tupleSize);
+    Update_Database_Size(meta, Read_Database_Size(meta) - tupleSize);
+    Update_Num_Tuples(meta, Read_Num_Tuples(meta) - 1);
+    return 1;
+}
+
+// int Update_Data_Tuple(char* name, )
 
 void f(){
     // char* schname = (char*) malloc(STRING * sizeof(char));
@@ -275,15 +303,20 @@ void f(){
     strcpy(fname, "test.db");
     char* schname = (char*) malloc(STRING * sizeof(char));
     strcpy(schname, "test.meta");
+    cout << "before" << endl;
+    cout << Read_Last_Tuple_Address(schname) << endl;
+    cout << Read_Database_Size(schname) << endl;
+    cout << Read_Num_Tuples(schname) << endl;
     int size, i = 0;
     cout << "enter number of tuples: ";
     cin >> size;
     while(i < size){
         cout << "Enter tuple: " << endl;
         string name;
-        int roll;
-        bool b;
-        cin >> name >> roll >> b;
+        int roll, bo;
+        bool b = false;
+        cin >> name >> roll >> bo;
+        if(bo) b = true;
         vector<AttributeNode*> tuple(3);
         cout << "here" << endl;
         tuple[0] = getAttributeNode(1, false, name, 2);
@@ -293,7 +326,42 @@ void f(){
         tuple[2] = getAttributeNode(1, b, "", 1);
         cout << "here" << endl;
         Write_In_Data_File(fname, schname, tuple, STRING + INTEGER + BOOL);
-        for(int i = 0; i < 3; i++) free(tuple[i]);
+        for(int j = 0; j < 3; j++){
+            if(tuple[j]->index == 2) free(tuple[j]->str);
+            free(tuple[j]);
+        }
+        i++;
+    }
+    cout << "after" << endl;
+    cout << Read_Last_Tuple_Address(schname) << endl;
+    cout << Read_Database_Size(schname) << endl;
+    cout << Read_Num_Tuples(schname) << endl;
+
+    
+}
+
+void g(){
+    char* name = (char*) malloc(STRING * sizeof(char));
+    strcpy(name, "test.db");
+    char* sch = (char*) malloc(STRING * sizeof(char));
+    strcpy(sch, "test.schema");
+    vector<pair<string,string>> schema = Read_Schema_File(sch);
+    cout << "schema" << endl;
+    for(pair<string,string> p: schema){
+        cout << p.first << " " << p.second << endl;
+    }
+    int ts = STRING + INTEGER + BOOL;
+    strcpy(sch, "test.meta");
+    Delete_Data_Tuple(name, sch, schema, 1, STRING + INTEGER + BOOL);
+    int size = Read_Num_Tuples(sch);
+    for(int i = 0; i < size; i++){
+        vector<AttributeNode*> tuple = Read_Data_File(name, schema, i, ts);
+        for(AttributeNode* node: tuple){
+            if(node->index == 0) cout << node->num << " ";
+            else if(node->index == 1) cout << node->b << " ";
+            else cout << node->str << " ";
+        }
+        cout << endl;
     }
 }
 
