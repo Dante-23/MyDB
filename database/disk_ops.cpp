@@ -7,15 +7,15 @@
 #include "query_parser.cpp"
 using namespace std;
 
-#define SCHEMA_ATTRIBUTE_SIZE 16
-#define SCHEMA_TYPE_SIZE 8
+#define SCHEMA_ATTRIBUTE_SIZE 16 // each schema attribute like name, roll etc will acquire this much size in schema file
+#define SCHEMA_TYPE_SIZE 8 // each schema attribute type like int, string etc will acquire this much size in schema file
 
-#define META_TUPLE_ADDRESS 4
-#define META_DATABASE_SIZE 4
-#define META_NUM_TUPLES 4
-#define META_TUPLE_SIZE 4
+#define META_TUPLE_ADDRESS 4 // The address at which new tuple will be inserted. Takes 4 bytes in meta file.
+#define META_DATABASE_SIZE 4 // Size of database. Takes 4 bytes in meta file
+#define META_NUM_TUPLES 4 // Number of tuples in database. Take 4 bytes in meta file
+#define META_TUPLE_SIZE 4 // Size of each tuple. Take 4 bytes in meta file
 
-extern int errno;
+extern int errno; // for printing errors
 
 // takes a name as input and makes a file
 // used to create to .schema .meta and .db files when first initializing a database
@@ -39,7 +39,10 @@ int create_file(char* name){
  * Database size
  * Number of tuples in database
  * Tuple size
- * Database name
+ * Database name --> which takes 32 bytes in meta file
+ * parameters:
+ * char* name = .meta file
+ * dbname = name of database
  **/
 int Initialize_Meta_File(char* name, string dbname){
     int fd = open(name, O_WRONLY);
@@ -73,6 +76,10 @@ int Initialize_Meta_File(char* name, string dbname){
     return 1;
 }
 
+/**
+ * Read the address at which new tuple will be inserted in data file
+ * char* name = .meta file
+ **/
 int Read_Last_Tuple_Address(char* name){
     int fd = open(name, O_RDONLY);
     void* buffer = malloc(4);
@@ -82,6 +89,11 @@ int Read_Last_Tuple_Address(char* name){
     return *p;
 }
 
+/**
+ * Updates the address at which new tuple will be inserted in data file
+ * char* name = .meta file
+ * address = address at which tuple will be inserted
+ **/
 int Update_Last_Tuple_Address(char* name, int address){
     int fd = open(name, O_WRONLY);
     ssize_t bytes = write(fd, (void*)&address, META_TUPLE_ADDRESS);
@@ -89,6 +101,10 @@ int Update_Last_Tuple_Address(char* name, int address){
     return 1;
 }
 
+/**
+ * Read database size
+ * char* name = .meta file
+ **/
 int Read_Database_Size(char* name){
     int fd = open(name, O_RDONLY);
     void* buffer = malloc(4);
@@ -99,6 +115,10 @@ int Read_Database_Size(char* name){
     return *p;
 }
 
+/**
+ * Updates database size
+ * char* name = .meta file
+ **/
 int Update_Database_Size(char* name, int newsize){
     int fd = open(name, O_WRONLY);
     lseek(fd, 4, SEEK_SET);
@@ -107,6 +127,10 @@ int Update_Database_Size(char* name, int newsize){
     return 1;
 }
 
+/**
+ * reads number of tuples in database
+ * char* name = .meta file
+ **/
 int Read_Num_Tuples(char* name){
     int fd = open(name, O_RDONLY);
     void* buffer = malloc(4);
@@ -117,6 +141,10 @@ int Read_Num_Tuples(char* name){
     return *p;
 }
 
+/**
+ * updates number of tuples in database
+ * char* name = .meta file
+ **/
 int Update_Num_Tuples(char* name, int tuples){
     int fd = open(name, O_WRONLY);
     lseek(fd, 8, SEEK_SET);
@@ -125,6 +153,10 @@ int Update_Num_Tuples(char* name, int tuples){
     return 1;
 }
 
+/**
+ * Reads size of each tuple
+ * char* name = .meta file
+ **/
 int Read_Tuple_Size(char* name){
     int fd = open(name, O_RDONLY);
     void* buffer = malloc(4);
@@ -147,6 +179,8 @@ string Read_DatabaseName(char* name){
  * Schema file contains contains schema details in pair
  * First = name of attribute
  * Second = Data type of attribute
+ * schema = contains schema info in pairs like (name, string), (roll, int) etc
+ * name = .schema file
  **/
 int Write_In_Schema_File(char* name, vector<pair<string,string>> schema){
     int fd = open(name, O_WRONLY);
@@ -169,6 +203,11 @@ int Write_In_Schema_File(char* name, vector<pair<string,string>> schema){
     return 1;
 }
 
+/**
+ * reads the schema from schema file and returns array of pairs.
+ * Example (name, string) (roll, int) etc
+ * char* name = .schema file
+ **/
 vector<pair<string,string>> Read_Schema_File(char* name){
     vector<pair<string,string>> schema;
     int fd = open(name, O_RDONLY);
@@ -192,6 +231,13 @@ vector<pair<string,string>> Read_Schema_File(char* name){
     return schema;
 }
 
+/**
+ * writes data in .db file and updates .meta file
+ * tuple = array containing tuple info in the same order as in schema
+ * char* name = .db file
+ * char* meta = .meta file
+ * tuplesize = size of each tuple in this database.
+ **/
 int Write_In_Data_File(char* name, char* meta, vector<AttributeNode*> tuple, int tuplesize){
     int last_address = Read_Last_Tuple_Address(meta);
     int fd = open(name, O_WRONLY), offset = last_address;
@@ -219,6 +265,15 @@ int Write_In_Data_File(char* name, char* meta, vector<AttributeNode*> tuple, int
     return 1;
 }
 
+/**
+ * This functions writes data at a specified index like writing it at index 2 or 3 etc.
+ * This is used in deletion and updation.
+ * When a tuple is deleted, the last tuple is copied to the deleted tuple position or index and .meta file is updated.
+ * tuple = same as above
+ * tupleNum = index to write tuple
+ * tuplesize = size of each tuple
+ * char* name = .db file
+ **/
 int Write_At_Location(char* name, vector<AttributeNode*> tuple, int tupleNum, int tupleSize){
     int fd = open(name, O_WRONLY);
     int offset = tupleNum * tupleSize;
@@ -241,6 +296,13 @@ int Write_At_Location(char* name, vector<AttributeNode*> tuple, int tupleNum, in
     return 1;
 }
 
+/**
+ * Reads the tuple at the specified position (tupleNum)
+ * schema = schema in pair form like (name, string), (roll, int) etc
+ * tupleSize = size of each tuple
+ * tupleNum = positon or index of the tuple to read
+ * char* name = .db file
+ **/
 vector<AttributeNode*> Read_Data_File(char* name, vector<pair<string,string>> schema, int tupleNum, int tuplesize){
     vector<AttributeNode*> tuple((int)schema.size());
     int index = 0, offset = tupleNum * tuplesize;
@@ -275,6 +337,15 @@ vector<AttributeNode*> Read_Data_File(char* name, vector<pair<string,string>> sc
     return tuple;
 }
 
+/**
+ * Deleted tuple at the specified position or index (tupleNum)
+ * copies the last tuple to the deleted position or index
+ * .meta file is updated
+ * char* meta = .meta file
+ * char* name = .db file
+ * tupleNum = position or index of tuple to be deleted
+ * tupleSize = size of each tuple
+ **/
 int Delete_Data_Tuple(char* name, char* meta, vector<pair<string,string>> schema, int tupleNum, int tupleSize){
     vector<AttributeNode*> tuple = Read_Data_File(name, schema, Read_Num_Tuples(meta) - 1, tupleSize);
     Write_At_Location(name, tuple, tupleNum, tupleSize);

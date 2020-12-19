@@ -3,16 +3,21 @@
 #include <vector>
 using namespace std;
 
-#define CREATE_SCHEMA 1
+#define CREATE_SCHEMA 1 // not used
 
-#define INTEGER 4
-#define BOOL 1
-#define STRING 32
+#define INTEGER 4 // Integer attribute data will take this much size in .db file
+#define BOOL 1 // Bool attribute data will take this much size in .db file
+#define STRING 32 // String attribute data will take this much size in .db file
 
+// The three datatypes we decided to use
 const string TYPE1 = "int";
 const string TYPE2 = "string";
 const string TYPE3 = "bool";
 
+// Every attribute in RAM will have this form
+// when it is a integer attribute, index = 0
+// when bool, index = 1
+// when string, index = 2
 struct AttributeNode{
     int num;
     bool b;
@@ -20,6 +25,10 @@ struct AttributeNode{
     int index;
 };
 
+// this will return a AttributeNode*
+// index = 0 when int
+// index = 1 when bool
+// index = 2 when string
 AttributeNode* getAttributeNode(int num, bool b, string str, int index){
     AttributeNode* node = (AttributeNode*) malloc(sizeof(AttributeNode));
     node->str = (char*) malloc(STRING * sizeof(char));
@@ -32,6 +41,7 @@ AttributeNode* getAttributeNode(int num, bool b, string str, int index){
     return node;
 }
 
+// returns tuple size taking schema as input
 int getTupleSize(vector<pair<string,string>> schema){
     int tot = 0;
     for(pair<string,string> p: schema){
@@ -42,6 +52,11 @@ int getTupleSize(vector<pair<string,string>> schema){
     return tot;
 }
 
+/**
+ * parses a insert query and returns array of AttributeNodes
+ * query is of following type:
+ * rahul 24 male
+ **/
 vector<AttributeNode*> getTuple(vector<pair<string,string>> schema, string query){
     vector<AttributeNode*> tuple(schema.size());
     int index = 0, i = 0;
@@ -71,6 +86,11 @@ string getDatabaseName(string query){
     return query.substr(sp, obrace - sp);
 }
 
+/**
+ * takes create schema (DDL) query and returns schema in pairs
+ * query is of following form
+ * create schema test(name string, roll int, engineer bool)
+ **/
 vector<pair<string,string>> parse_schema_DDL(string query){
     vector<pair<string,string>> schema;
     int obrace = query.find('('), cbrace = query.find(')');
