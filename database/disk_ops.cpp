@@ -71,9 +71,68 @@ int Initialize_Meta_File(char* name, int tupleSize, string dbname){
     write(fd, (void*)temp, STRING);
     offset += STRING;
 
+    write(fd, (void*)&nor, INTEGER);
+    offset += INTEGER;
+
     close(fd);
     free(temp);
     return 1;
+}
+
+int Read_Num_Index(char* name){
+    int offset = 32 + 16;
+    int fd = open(name, O_RDONLY);
+    lseek(fd, offset, SEEK_SET);
+    void* buf = malloc(INTEGER);
+    read(fd, buf, INTEGER);
+    int* p = (int*)buf;
+    int res = *p;
+    free(buf);
+    close(fd);
+    return res;
+}
+
+int Update_Num_Index(char* name, int indexNum){
+    int offset = 32 + 16;
+    int fd = open(name, O_WRONLY);
+    lseek(fd, offset, SEEK_SET);
+    write(fd, (void*)&indexNum, INTEGER);
+    close(fd);
+    return 1;
+}
+
+int Write_Index(char* name, vector<int> arr){
+    int size = (int)arr.size();
+    Update_Num_Index(name, size);
+    int offset = 32 + 20;
+    int fd = open(name, O_WRONLY);
+    lseek(fd, offset, SEEK_SET);
+    for(int i: arr){
+        write(fd, (void*)&i, INTEGER);
+        offset += INTEGER;
+        lseek(fd, offset, SEEK_SET);
+    }
+    close(fd);
+    return 1;
+}
+
+vector<int> Read_Index(char* name){
+    int size = Read_Num_Index(name);
+    vector<int> arr;
+    int offset = 32 + 20;
+    int fd = open(name, O_RDONLY);
+    lseek(fd, offset, SEEK_SET);
+    void* buf = malloc(INTEGER);
+    while(size--){
+        read(fd, buf, INTEGER);
+        int *p = (int*)buf;
+        arr.push_back(*p);
+        offset += INTEGER;
+        lseek(fd, offset, SEEK_SET);
+    }
+    free(buf);
+    close(fd);
+    return arr;
 }
 
 /**
@@ -353,123 +412,4 @@ int Delete_Data_Tuple(char* name, char* meta, vector<pair<string,string>> schema
     Update_Database_Size(meta, Read_Database_Size(meta) - tupleSize);
     Update_Num_Tuples(meta, Read_Num_Tuples(meta) - 1);
     return 1;
-}
-
-int main(){
-    /**
-     * schema creation syntax
-     * 1 create schema database_name(attr type, attr type, ......)
-     * 
-     * insert syntax
-     * 2 database_name attr1value attr2value attr3value ........
-     * 
-     * print all tuples syntax
-     * 3 database_name
-     * 
-     * print meta and schema file contents syntax
-     * 4 database_name
-     * 
-     * Delete syntax
-     * 5 database_name index_of_the_tuple (0 based index)
-     **/
-    while(1){
-        cout << "enter query: ";
-        string query;
-        getline(cin, query);
-        if(query[0] == '1'){
-            int sp = query.find(' ');
-            query = query.substr(sp + 1, query.size() - sp);
-            vector<pair<string,string>> schema = parse_schema_DDL(query);
-            string dbname = getDatabaseName(query);
-            char* name = (char*) malloc(STRING * sizeof(char));
-            strcpy(name, (dbname + ".schema").c_str());
-            create_file(name);
-            cout << "created schema file" << endl;
-            Write_In_Schema_File(name, schema);
-            int tupleSize = getTupleSize(schema);
-            cout << "wrote schema in schema file" << endl;
-            strcpy(name, (dbname + ".meta").c_str());
-            create_file(name);
-            cout << "created metadata file" << endl;
-            Initialize_Meta_File(name, tupleSize, dbname);
-            cout << "initialized metadata file" << endl;
-            tupleSize = Read_Tuple_Size(name);
-            cout << "tupleSize: " << tupleSize << endl;
-            strcpy(name, (dbname + ".db").c_str());
-            create_file(name);
-            cout << "created database file" << endl;
-            strcpy(name, (dbname + ".avl").c_str());
-            create_file(name);
-            cout << "created avl index file" << endl;
-            strcpy(name, (dbname + ".btree").c_str());
-            create_file(name);
-            cout << "created B-Tree index file" << endl;
-            free(name);
-        }
-        else if(query[0] == '2'){
-            int sp = query.find(' ') + 1;
-            string dbname = query.substr(sp, query.find(' ', sp) - sp);
-            char* name = (char*) malloc(STRING * sizeof(char));
-            char* meta = (char*) malloc(STRING * sizeof(char));
-            strcpy(name, (dbname + ".schema").c_str());
-            vector<AttributeNode*> tuple = getTuple(Read_Schema_File(name), query.substr(query.find(' ', sp) + 1, query.size() - query.find(' ', sp)));
-            int tupleSize = getTupleSize(Read_Schema_File(name));
-            strcpy(name, (dbname + ".db").c_str());
-            strcpy(meta, (dbname + ".meta").c_str());
-            Write_In_Data_File(name, meta, tuple, tupleSize);
-            free(name);
-            free(meta);
-        }
-        else if(query[0] == '3'){
-            char* name = (char*) malloc(STRING * sizeof(char));
-            char* meta = (char*) malloc(STRING * sizeof(char));
-            string dbname = query.substr(query.find(' ') + 1, query.size() - query.find(' '));
-            strcpy(meta, (dbname + ".meta").c_str());
-            strcpy(name, (dbname + ".db").c_str());
-            int size = Read_Num_Tuples(meta);
-            strcpy(meta, (dbname + ".schema").c_str());
-            vector<pair<string,string>> schema = Read_Schema_File(meta);
-            cout << "Tuple: " << endl;
-            for(int i = 0; i < size; i++){
-                vector<AttributeNode*> tuple = Read_Data_File(name, schema, i, getTupleSize(schema));
-                for(AttributeNode* node: tuple){
-                    if(node->index == 0) cout << node->num << " ";
-                    else if(node->index == 1) cout << node->b << " ";
-                    else cout << node->str << " ";
-                }
-                cout << endl;
-            }
-            free(name);
-            free(meta);
-        }
-        else if(query[0] == '4'){
-            string dbname = query.substr(query.find(' ') + 1, query.size() - query.find(' '));
-            char* meta = (char*) malloc(STRING * sizeof(char));
-            strcpy(meta, (dbname + ".meta").c_str());
-            cout << "Last tuple address: " << Read_Last_Tuple_Address(meta) << endl;
-            cout << "Database size: " << Read_Database_Size(meta) << endl;
-            cout << "Number of Tuples: " << Read_Num_Tuples(meta) << endl;
-            cout << "Tuple Size: " << Read_Tuple_Size(meta) << endl;
-            cout << "Database name: " << Read_DatabaseName(meta) << endl;
-            strcpy(meta, (dbname + ".schema").c_str());
-            cout << "Schema: " << endl;
-            vector<pair<string,string>> schema = Read_Schema_File(meta);
-            for(pair<string,string> p: schema){
-                cout << p.first << " " << p.second << endl;
-            }
-        }
-        else if(query[0] == '5'){
-            int fsp = query.find(' '), ssp = query.find(' ', fsp + 1);
-            string dbname = query.substr(fsp + 1, ssp - fsp - 1);
-            int tupleNum = stoi(query.substr(ssp + 1, query.size() - ssp));
-            // cout << dbname << " " << tupleNum << endl;
-            char* name = (char*) malloc(STRING * sizeof(char));
-            char* meta = (char*) malloc(STRING * sizeof(char));
-            strcpy(name, (dbname + ".schema").c_str());
-            strcpy(meta, (dbname + ".meta").c_str());
-            vector<pair<string,string>> schema = Read_Schema_File(name);
-            strcpy(name, (dbname + ".db").c_str());
-            Delete_Data_Tuple(name, meta, schema, tupleNum, Read_Tuple_Size(meta));
-        }
-    }
 }

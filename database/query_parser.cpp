@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string.h>
 #include <vector>
+#include <set>
 using namespace std;
 
 #define CREATE_SCHEMA 1 // not used
@@ -8,6 +9,10 @@ using namespace std;
 #define INTEGER 4 // Integer attribute data will take this much size in .db file
 #define BOOL 1 // Bool attribute data will take this much size in .db file
 #define STRING 32 // String attribute data will take this much size in .db file
+
+#define NODEPOINTER 4
+#define BLOCKPOINTER 4
+#define AVLNODESIZE 128
 
 // The three datatypes we decided to use
 const string TYPE1 = "int";
@@ -24,6 +29,33 @@ struct AttributeNode{
     char* str;
     int index;
 };
+
+struct AVLNODE{
+    int intkey;
+    char* stringkey;
+    int parent;
+    int left;
+    int right;
+    int size;
+    int index;
+    int height;
+    set<int> blocks;
+};
+
+AVLNODE* GetAVLNODE(int intkey, char*stringkey, int parent, int left, int right, 
+                    int size, int index, set<int> blocks){
+    AVLNODE* node = new AVLNODE();
+    node->stringkey = (char*) malloc(STRING * sizeof(char));
+    node->parent = parent;
+    node->left = left;
+    node->right = right;
+    node->size = size;
+    node->blocks = blocks;
+    node->height = 0;
+    node->intkey = intkey;
+    strcpy(node->stringkey, stringkey);
+    return node;
+}
 
 // this will return a AttributeNode*
 // index = 0 when int
