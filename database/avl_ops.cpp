@@ -294,8 +294,10 @@ int Insert_INT_AVLindex(char* name, int nodeNum, int parent, int value, int bloc
 }
 
 int Search_INT_AVLindex(char* name, int nodeNum, int parent, int value){
+    // cout << "nodeNum: " << nodeNum << endl;
     if(nodeNum == -1) return -1;
     AVLNODE* node = Read_AVLNODE(name, nodeNum, 0);
+    cout << "node->intkey: " << node->intkey << endl;
     int res = -1;
     if(node->intkey == value){
         res = nodeNum;
@@ -304,7 +306,7 @@ int Search_INT_AVLindex(char* name, int nodeNum, int parent, int value){
         res = Search_INT_AVLindex(name, node->left, nodeNum, value);
     }
     else{
-        res = Search_INT_AVLindex(name, node->left, nodeNum, value);
+        res = Search_INT_AVLindex(name, node->right, nodeNum, value);
     }
     delete node;
     return res;

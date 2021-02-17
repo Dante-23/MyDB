@@ -321,7 +321,7 @@ int Write_In_Data_File(char* name, char* meta, vector<AttributeNode*> tuple, int
     Update_Last_Tuple_Address(meta, last_address + tuplesize);
     Update_Database_Size(meta, Read_Database_Size(meta) + tuplesize);
     Update_Num_Tuples(meta, Read_Num_Tuples(meta) + 1);
-    return 1;
+    return last_address;
 }
 
 /**

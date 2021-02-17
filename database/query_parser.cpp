@@ -2,6 +2,7 @@
 #include <string.h>
 #include <vector>
 #include <set>
+#include <algorithm>
 using namespace std;
 
 #define CREATE_SCHEMA 1 // not used
