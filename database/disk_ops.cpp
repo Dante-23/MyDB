@@ -32,6 +32,10 @@ int create_file(char* name){
     }
 }
 
+int Delete_file(char* name){
+    return remove(name);
+}
+
 /**
  * After creating .meta file, it is initialized
  * meta file contains five information as of now
@@ -143,9 +147,10 @@ int Read_Last_Tuple_Address(char* name){
     int fd = open(name, O_RDONLY);
     void* buffer = malloc(4);
     ssize_t bytes = read(fd, buffer, META_TUPLE_ADDRESS);
-    int* p = (int*)buffer;
+    int p = *((int*)buffer);
     close(fd);
-    return *p;
+    free(buffer);
+    return p;
 }
 
 /**
@@ -168,10 +173,10 @@ int Read_Database_Size(char* name){
     int fd = open(name, O_RDONLY);
     void* buffer = malloc(4);
     lseek(fd, 4, SEEK_SET);
-    ssize_t bytes = read(fd, buffer, META_TUPLE_ADDRESS);
-    int* p = (int*)buffer;
+    ssize_t bytes = read(fd, buffer, META_DATABASE_SIZE);
+    int p = *((int*)buffer);
     close(fd);
-    return *p;
+    return p;
 }
 
 /**
@@ -195,9 +200,9 @@ int Read_Num_Tuples(char* name){
     void* buffer = malloc(4);
     lseek(fd, 8, SEEK_SET);
     ssize_t bytes = read(fd, buffer, META_TUPLE_ADDRESS);
-    int* p = (int*)buffer;
+    int p = *((int*)buffer);
     close(fd);
-    return *p;
+    return p;
 }
 
 /**
@@ -221,9 +226,9 @@ int Read_Tuple_Size(char* name){
     void* buffer = malloc(4);
     lseek(fd, 12, SEEK_SET);
     ssize_t bytes = read(fd, buffer, META_TUPLE_ADDRESS);
-    int* p = (int*)buffer;
+    int p = *((int*)buffer);
     close(fd);
-    return *p;
+    return p;
 }
 
 string Read_DatabaseName(char* name){
@@ -231,6 +236,7 @@ string Read_DatabaseName(char* name){
     char* buffer = (char*) malloc(STRING * sizeof(char));
     lseek(fd, 16, SEEK_SET);
     ssize_t bytes = read(fd, (void*)buffer, STRING);
+    close(fd);
     return buffer;
 }
 
@@ -318,9 +324,28 @@ int Write_In_Data_File(char* name, char* meta, vector<AttributeNode*> tuple, int
     }
     // free(temp);
     close(fd);
+    int dbsize = Read_Database_Size(meta);
+    int numtuple = Read_Num_Tuples(meta);
+    cout << "TupleSize: " << tuplesize << endl;
+    cout << "Old last tuple address: " << last_address << endl;
+    cout << "Old database size: " << dbsize << endl;
+    cout << "Old number of tuples: " << numtuple << endl;
+    cout << "New last tuple address: " << last_address + tuplesize << endl;
+    cout << "New database size: " << dbsize + tuplesize << endl;
+    cout << "New number of tuples: " << numtuple + 1 << endl;
     Update_Last_Tuple_Address(meta, last_address + tuplesize);
-    Update_Database_Size(meta, Read_Database_Size(meta) + tuplesize);
-    Update_Num_Tuples(meta, Read_Num_Tuples(meta) + 1);
+    Update_Database_Size(meta, dbsize + tuplesize);
+    Update_Num_Tuples(meta, numtuple + 1);
+    dbsize = Read_Database_Size(meta);
+    numtuple = Read_Num_Tuples(meta);
+    int ts = Read_Tuple_Size(meta);
+    cout << "TupleSize: " << ts << endl;
+    cout << "Old last tuple address: " << last_address << endl;
+    cout << "Old database size: " << dbsize << endl;
+    cout << "Old number of tuples: " << numtuple << endl;
+    cout << "Old last tuple address: " << last_address + tuplesize << endl;
+    cout << "Old database size: " << Read_Database_Size(meta) + tuplesize << endl;
+    cout << "Old number of tuples: " << Read_Num_Tuples(meta) + 1 << endl;
     return last_address;
 }
 
@@ -352,6 +377,7 @@ int Write_At_Location(char* name, vector<AttributeNode*> tuple, int tupleNum, in
             offset += STRING;
         }
     }
+    close(fd);
     return 1;
 }
 

@@ -11,6 +11,7 @@ int Initialize_AVLindex(char* name){
     lseek(fd, NODEPOINTER, SEEK_SET);
     num = -1;
     write(fd, (void*)&num, NODEPOINTER);
+    close(fd);
     return 1;
 }
 
@@ -110,6 +111,7 @@ int Write_AVLNODE(char* name, int nodeNum, AVLNODE* node){
         offset += NODEPOINTER;
         // cout << bytes << endl;
     }
+    close(fd);
     return 1;
 }
 
@@ -215,7 +217,7 @@ int BalanceTree(char* name, int nodeNum){
     AVLNODE* node = Read_AVLNODE(name, nodeNum, 0);
     int left = getHeight(name, node->left) + 1,
     right = getHeight(name, node->right) + 1;
-    cout << "left - right: " << left - right << endl;
+    // cout << "left - right: " << left - right << endl;
     int resAddr = nodeNum;
     if(left - right > 1){
         // left
@@ -267,7 +269,7 @@ int Insert_INT_AVLindex(char* name, int nodeNum, int parent, int value, int bloc
     }
     AVLNODE* node = Read_AVLNODE(name, nodeNum, 0);
     if(node->intkey == value){
-        cout << "present" << endl;
+        // cout << "present" << endl;
         node->size++;
         node->blocks.insert(block_pointer);
     }
@@ -297,7 +299,7 @@ int Search_INT_AVLindex(char* name, int nodeNum, int parent, int value){
     // cout << "nodeNum: " << nodeNum << endl;
     if(nodeNum == -1) return -1;
     AVLNODE* node = Read_AVLNODE(name, nodeNum, 0);
-    cout << "node->intkey: " << node->intkey << endl;
+    // cout << "node->intkey: " << node->intkey << endl;
     int res = -1;
     if(node->intkey == value){
         res = nodeNum;
