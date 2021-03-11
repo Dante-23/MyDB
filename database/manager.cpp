@@ -1,11 +1,15 @@
 #include "avl_ops.cpp"
+#include <chrono>
+using namespace std::chrono;
+
+#define SPACE 20
+#define LINEHEIGHT 3
 
 vector<int> index_attr; // assuming it is sorted
 vector<char*> names;
 
 void InitializeIndexes(){
     for(int i = 0; i < (int)index_attr.size(); i++){
-        // cout << names[i] << endl;
         create_file(names[i]);
         Initialize_AVLindex(names[i]);
     }
@@ -21,11 +25,6 @@ void Initialize_DB(char* name, char* meta){
         names.push_back((char*) malloc(STRING * sizeof(char)));
         strcpy(names[i], curr.c_str());
     }
-    // for(int i = 0; i < (int)index_attr.size(); i++){
-    //     cout << names[i] << endl;
-    //     create_file(names[i]);
-    //     Initialize_AVLindex(names[i]);
-    // }
 }
 
 int Update_Index(char* name, char* meta, vector<AttributeNode*> tuple, int blockaddr){
@@ -37,8 +36,11 @@ int Update_Index(char* name, char* meta, vector<AttributeNode*> tuple, int block
         if(tuple[index_attr[i]]->index == 0){
             key = tuple[index_attr[i]]->num;
         }
+        else{
+            continue;
+        }
         int root = Read_4Bytes_Address(names[i], 4);
-        root = Insert_INT_AVLindex(names[i], root, -1, key, blockaddr);
+        root = Insert_INT_AVLindex(names[i], root, -1, key, blockaddr, index_attr[i]);
         Update_Root_Address(names[i], root);
     }
     return 1;
@@ -46,21 +48,90 @@ int Update_Index(char* name, char* meta, vector<AttributeNode*> tuple, int block
 
 void PrintTuple(vector<AttributeNode*> tuple){
     for(AttributeNode* node: tuple){
-        if(node->index == 0) cout << node->num << " ";
-        else if(node->index == 1) cout << node->b << " ";
-        else cout << node->str << " ";
+        int len = 0;
+        if(node->index == 0){
+            cout << node->num << " ";
+            len += (int)to_string(node->num).size();
+        }
+        else if(node->index == 1){
+            cout << node->b << " ";
+            len++;
+        }
+        else{
+            cout << node->str << " ";
+            len += (int)strlen(node->str);
+        }
+        len = (int)SPACE - len - 1;
+        while(len > 0){
+            cout << " ";
+            len--;
+        }
+        cout << "|";
     }
     cout << endl;
+}
+
+void PrintSchema(vector<pair<string,string>> schema){
+    for(pair<string,string> p: schema){
+        cout << p.first << " ";
+        int len = (int)p.first.size();
+        len = SPACE - len - 1;
+        while(len > 0){
+            cout << " ";
+            len--;
+        }
+        cout << "|";
+    }
+    cout << endl;
+}
+
+void PrintLines(int times){
+    while(times > 0){
+        cout << endl;
+        times--;
+    }
+}
+
+void PrintSpace(int times){
+    while(times > 0){
+        cout << " ";
+        times--;
+    }
+}
+
+void PrintUnderScore(int times){
+    while(times > 0){
+        cout << "_";
+        times--;
+    }
+    cout << endl;
+}
+
+void PrintSchemaWithType(vector<pair<string,string>> schema){
+    PrintUnderScore(2 * (int)SPACE);
+    cout << "Attribute Name";
+    PrintSpace(5);
+    cout << "|";
+    cout << "Attribute Type";
+    PrintSpace(5);
+    cout << "|";
+    cout << endl;
+    PrintUnderScore(2 * (int)SPACE);
+    for(pair<string,string> p: schema){
+        cout << p.first;
+        PrintSpace(SPACE - p.first.size() - 1);
+        cout << "|";
+        cout << p.second;
+        PrintSpace(SPACE - p.first.size() - 1);
+        cout << "|" << endl;
+        PrintUnderScore(2 * (int)SPACE);
+    }
 }
 
 vector<int> Search_Index(int i, int val){
     vector<int> arr;
     int root = Read_4Bytes_Address(names[i], 4);
-    // cout << "here" << endl;
-    cout << names[i] << " " << val << endl;
-    int avlNodeLoc = Search_INT_AVLindex(names[i], root, -1, val);
-    // cout << "here" << endl;
-    cout << "avlNodeLoc: " << avlNodeLoc << endl;
+    int avlNodeLoc = Search_INT_AVLindex(names[i], root, -1, val, index_attr[i]);
     if(avlNodeLoc != -1){
         AVLNODE* node = Read_AVLNODE(names[i], avlNodeLoc, 0);
         for(auto i: node->blocks){
@@ -125,41 +196,20 @@ int DropDatabase(char* name, char* dbname, char* meta, char* schname){
 vector<int> Search_Database(char* name, char* dbname, char* meta, vector<pair<string,string>> schema, vector<pair<string,string>> arr){
     vector<int> positions = GetPositions(schema, arr);
     Initialize_DB(name, meta);
-    // cout << "here" << endl;
-    // for(int i: positions){
-    //     cout << i << " ";
-    // }
-    // cout << endl;
-    // // cout << 
-    // for(int i: index_attr){
-    //     cout << i << " ";
-    // }
-    // cout << endl;
-    // for(char* i: names){
-    //     cout << i << " ";
-    // }
-    // cout << endl;
+    
     for(int i = 0; i < (int)arr.size(); i++){
         int bs = BinarySearch(positions[i]);
         if(bs != -1){
-            // cout << "found index" << endl;
             vector<int> blocks = Search_Index(bs, stoi(arr[i].second));
-            // cout << "found index" << endl;
-            // cout << "blocks: " << endl;
-            // for(int i: blocks) cout << i << " ";
-            // cout << endl;
             vector<int> res;
             for(int i = 0; i < (int)blocks.size(); i++){
                 vector<AttributeNode*> tuple = Read_Data_File(dbname, schema, blocks[i] / getTupleSize(schema), 
                                                 getTupleSize(schema));
-                // PrintTuple(tuple);
                 int index = 0;
                 bool ok = true;
                 for(int k = 0; k < (int)tuple.size() && index < (int)arr.size(); k++){
                     if(k == positions[index]){
                         if(tuple[k]->index == 0){
-                            // cout << "reached" << endl;
-                            // cout << tuple[k]->num << " " << stoi(arr[index].second) << endl;
                             if(tuple[k]->num == stoi(arr[index].second)){
                                 index++;
                                 // cout << "reached" << endl;
@@ -200,21 +250,79 @@ vector<int> Search_Database(char* name, char* dbname, char* meta, vector<pair<st
     return {};
 }
 
-int Delete_In_Database(char* name, char* dbname, char* meta, vector<pair<string,string>> schema, vector<pair<string,string>> arr){
-    vector<int> blocks = Search_Database(name, dbname, meta, schema, arr);
-    for(int i: blocks){
-        int tupleNum = i / getTupleSize(schema), 
-        tupleSize = getTupleSize(schema);
-        Delete_Data_Tuple(dbname, meta, schema, tupleNum, tupleSize);
-        
-        vector<AttributeNode*> tuple = Read_Data_File(dbname, schema, tupleNum, tupleSize);
-        for(int j = 0; j < (int)tuple.size(); j++){
-            int bs = BinarySearch(j);
-            if(bs == -1) continue;
-
-        }
+int Delete_Inner(char* dbname, char* meta, vector<pair<string,string>> schema, int i){
+    int tupleNum = i / getTupleSize(schema), 
+    tupleSize = getTupleSize(schema);
+    vector<AttributeNode*> tuple = Read_Data_File(dbname, schema, tupleNum, tupleSize);
+    for(int j = 0; j < (int)tuple.size(); j++){
+        int bs = BinarySearch(j);
+        if(bs == -1) continue;
+        int root = Read_4Bytes_Address(names[bs], 4);
+        Delete_AVLBlock(names[bs], root, i, tuple[j]->num, index_attr[bs]);
+    }
+    Delete_Data_Tuple(dbname, meta, schema, tupleNum, tupleSize);
+    
+    tuple = Read_Data_File(dbname, schema, tupleNum, tupleSize);
+    for(int j = 0; j < (int)tuple.size(); j++){
+        int bs = BinarySearch(j);
+        if(bs == -1) continue;
+        int root = Read_4Bytes_Address(names[bs], 4);
+        int avlloc = Search_INT_AVLindex(names[bs], root, -1, tuple[j]->num, index_attr[bs]);
+        int oldblock = Read_Last_Tuple_Address(meta);
+        Replace_AVLBlock(names[bs], avlloc + 5 * INTEGER, oldblock, i);
+        if(avlnodes.find({index_attr[bs], avlloc}) != avlnodes.end())
+            avlnodes.erase({index_attr[bs], avlloc});
     }
     return 1;
+}
+
+int Delete_In_Database(char* name, char* dbname, char* meta, vector<pair<string,string>> schema, vector<pair<string,string>> arr){
+    vector<int> blocks = Search_Database(name, dbname, meta, schema, arr);
+    int deleted = 0;
+    while((int)blocks.size() > 0){
+        Delete_Inner(dbname, meta, schema, blocks[0]);
+        blocks = Search_Database(name, dbname, meta, schema, arr);
+        deleted++;
+    }
+    return deleted;
+}
+
+void Update_Attr(AttributeNode* node, string val){
+    if(node->index == 0)
+        node->num = stoi(val);
+    else if(node->index == 1)
+        node->b = stoi(val);
+    else
+        strcpy(node->str, val.c_str());
+}
+
+int Update_In_Database(char* name, char* dbname, char* meta, vector<pair<string,string>> schema, vector<pair<string,string>> arr1,
+                        vector<pair<string,string>> arr2){
+    vector<int> blocks = Search_Database(name, dbname, meta, schema, arr1);
+    vector<int> positions = GetPositions(schema, arr2);
+    int tupleSize = getTupleSize(schema);
+    int updated = 0, loop = 0;
+    while((int)blocks.size() > 0 && loop < 10){
+        int tupleNum = blocks[0] / tupleSize;
+        vector<AttributeNode*> tuple = Read_Data_File(dbname, schema, tupleNum, tupleSize);
+        Delete_Inner(dbname, meta, schema, blocks[0]);
+        int index = 0;
+        for(int j = 0; j < (int)tuple.size() && index < (int)positions.size(); j++){
+            if(j == positions[index]){
+                Update_Attr(tuple[j], arr2[index].second);
+                index++;
+            }
+        }
+        int blockaddr = Write_In_Data_File(dbname, meta, tuple, tupleSize);
+        cout << "Written in Data File" << endl;
+        Update_Index(name, meta, tuple, blockaddr);
+        cout << "Updated Index File" << endl;
+        FreeTuple(tuple);
+        blocks = Search_Database(name, dbname, meta, schema, arr1);
+        updated++;
+        loop++;
+    }
+    return updated;
 }
 
 vector<vector<int>> arr(3, vector<int>(1e5 + 1, 0));
@@ -230,11 +338,13 @@ int getNextNum(int i){
 
 void test(){
     string name = "abcdefgh";
+    cout << "Enter Number of tuples: ";
     int MAXN;
     cin >> MAXN;
     // vector<int> roll(100000 + 1, 0);
     // vector<int> sal(100000 + 1, 0);
     // vector<int> pin(100000 + 1, 0);
+  auto start = high_resolution_clock::now();
     char* dbname = (char*) malloc(STRING * sizeof(char));
     char* meta = (char*) malloc(STRING * sizeof(char));
     char* temp = (char*) malloc(STRING * sizeof(char));
@@ -278,12 +388,18 @@ void test(){
         tuple[3] = node4;
         int blockAddr = Write_In_Data_File(dbname, meta, tuple, 44);
         // cout << "i: " << i << endl;
-        // Update_Index(temp, meta, tuple, blockAddr);
+        Update_Index(temp, meta, tuple, blockAddr);
         // FreeTuple(tuple);
         // next_permutation(name.begin(), name.end());
-        // cout << "i: " << i << endl;
+        if(i % 100 == 0) cout << "i: " << i << endl;
     }
-    cout << "done" << endl;
+  auto stop = high_resolution_clock::now(); 
+  
+    // Get duration. Substart timepoints to  
+    // get durarion. To cast it to proper unit 
+    // use duration cast method 
+    auto duration = duration_cast<microseconds>(stop - start);
+    cout << "done in: " << duration.count() / 1000 << endl;
     // while(1){
     //     cout << rand() << endl;
     // }
@@ -340,31 +456,55 @@ void test2(){
 }
 
 int main(){
+    // int i;
+    // cout << sizeof(i) << endl;
     // test2();
     /**
+     * Example schema = name(string), roll(int), salary(int), pincode(int)
+     * 
      * schema creation syntax
      * 1 create schema database_name(attr type, attr type, ......)
+     * Ex. = 1 create schema Person(name string, roll int, salary int, pincode int)
+     * After creation put indexing details if needed.
      * 
      * insert syntax
      * 2 database_name attr1value attr2value attr3value ........
+     * 2 Person Rahul 24 50000 833201
      * 
      * print all tuples syntax
      * 3 database_name
+     * 3 Person
      * 
      * print meta and schema file contents syntax
      * 4 database_name
-     * 
-     * Delete syntax
-     * 5 database_name index_of_the_tuple (0 based index)
+     * 4 Person
      * 
      * Put Indexing details
      * 6 database_name attr0 attr1 ..... 
+     * 6 Person 1 2 3
+     * The above means I want indexes for attributes at position 1(roll), 2(salary), 3(pincode);
+     * Indexing only works for INTEGER attributes
      * 
      * Search database
      * 7 database_name attr1 value attr2 value ....
+     * 7 Person roll 24 OR
+     * 7 Person salary 20000 OR
+     * 7 Person roll 24 salary 20000
      * 
      * Delete database
      * 8 database_name
+     * 8 Person
+     * 
+     * Delete from database syntax
+     * d database_name attr1 value1 attr2 value .....
+     * d Person roll 24 salary 50000 
+     * This means delete all tuples whose roll = 24 and salary = 50000
+     * 
+     * Update database syntax
+     * u database_name attr1 value1 attr2 value2 ....., attr1 value1 attr2 value2 ..... 
+     * u Person roll 24 salary 50000, roll 22
+     * This means update roll to 24 and salary to 50000 where roll = 22
+     * 
      **/
     while(1){
         cout << "Enter query: ";
@@ -378,6 +518,7 @@ int main(){
             char* name = (char*) malloc(STRING * sizeof(char));
             strcpy(name, (dbname + ".schema").c_str());
             create_file(name);
+            PrintLines(LINEHEIGHT);
             cout << "created schema file" << endl;
             Write_In_Schema_File(name, schema);
             int tupleSize = getTupleSize(schema);
@@ -403,6 +544,7 @@ int main(){
             strcpy(name, (dbname + ".btree").c_str());
             create_file(name);
             cout << "created B-Tree index file" << endl;
+            PrintLines(LINEHEIGHT);
             free(name);
         }
         else if(query[0] == '2'){
@@ -432,12 +574,21 @@ int main(){
             int size = Read_Num_Tuples(meta);
             strcpy(meta, (dbname + ".schema").c_str());
             vector<pair<string,string>> schema = Read_Schema_File(meta);
-            cout << "Tuples: " << size << endl;
+            int tot = 0;
+            PrintLines(LINEHEIGHT);
+            PrintUnderScore((int)schema.size() * (int)SPACE);
+            PrintSchema(schema);
+            PrintUnderScore((int)schema.size() * (int)SPACE);
             for(int i = 0; i < size; i++){
                 vector<AttributeNode*> tuple = Read_Data_File(name, schema, i, getTupleSize(schema));
                 PrintTuple(tuple);
+                PrintUnderScore((int)schema.size() * (int)SPACE);
                 FreeTuple(tuple);
+                tot++;
             }
+            PrintLines(LINEHEIGHT);
+            cout << "Total read: " << tot << endl;
+            PrintLines(LINEHEIGHT);
             free(name);
             free(meta);
         }
@@ -450,30 +601,31 @@ int main(){
             int numtuples = Read_Num_Tuples(meta);
             string name = Read_DatabaseName(meta);
             int tupleSize = Read_Tuple_Size(meta);
-            cout << "Last tuple address: " << lta << endl;
-            cout << "Database size: " << dbsize << endl;
-            cout << "Number of Tuples: " << numtuples << endl;
-            cout << "Tuple Size: " << tupleSize << endl;
-            cout << "Database name: " << name << endl;
+            PrintLines(LINEHEIGHT);
+            cout << "Last tuple address:       " << lta << endl;
+            cout << "Database size:            " << dbsize << endl;
+            cout << "Number of Tuples:         " << numtuples << endl;
+            cout << "Tuple Size:               " << tupleSize << endl;
+            cout << "Database name:            " << name << endl;
+            PrintLines(LINEHEIGHT);
             strcpy(meta, (dbname + ".schema").c_str());
-            cout << "Schema: " << endl;
             vector<pair<string,string>> schema = Read_Schema_File(meta);
-            for(pair<string,string> p: schema){
-                cout << p.first << " " << p.second << endl;
-            }
+            PrintSchemaWithType(schema);
+            PrintLines(LINEHEIGHT);
+            free(meta);
         }
         else if(query[0] == '5'){
-            int fsp = query.find(' '), ssp = query.find(' ', fsp + 1);
-            string dbname = query.substr(fsp + 1, ssp - fsp - 1);
-            int tupleNum = stoi(query.substr(ssp + 1, query.size() - ssp));
-            // cout << dbname << " " << tupleNum << endl;
-            char* name = (char*) malloc(STRING * sizeof(char));
-            char* meta = (char*) malloc(STRING * sizeof(char));
-            strcpy(name, (dbname + ".schema").c_str());
-            strcpy(meta, (dbname + ".meta").c_str());
-            vector<pair<string,string>> schema = Read_Schema_File(name);
-            strcpy(name, (dbname + ".db").c_str());
-            Delete_Data_Tuple(name, meta, schema, tupleNum, Read_Tuple_Size(meta));
+            // int fsp = query.find(' '), ssp = query.find(' ', fsp + 1);
+            // string dbname = query.substr(fsp + 1, ssp - fsp - 1);
+            // int tupleNum = stoi(query.substr(ssp + 1, query.size() - ssp));
+            // // cout << dbname << " " << tupleNum << endl;
+            // char* name = (char*) malloc(STRING * sizeof(char));
+            // char* meta = (char*) malloc(STRING * sizeof(char));
+            // strcpy(name, (dbname + ".schema").c_str());
+            // strcpy(meta, (dbname + ".meta").c_str());
+            // vector<pair<string,string>> schema = Read_Schema_File(name);
+            // strcpy(name, (dbname + ".db").c_str());
+            // Delete_Data_Tuple(name, meta, schema, tupleNum, Read_Tuple_Size(meta));
         }
         else if(query[0] == '6'){
             string dbname = "";
@@ -506,6 +658,11 @@ int main(){
             // cout << endl;
             Initialize_DB(name, meta);
             InitializeIndexes();
+            PrintLines(LINEHEIGHT);
+            cout << "Index details saved" << endl;
+            PrintLines(LINEHEIGHT);
+            free(name);
+            free(meta);
         }
         else if(query[0] == '7'){
             string dbname = "";
@@ -542,12 +699,131 @@ int main(){
             strcpy(temp, (dbname).c_str());
             vector<pair<string, string>> schema = Read_Schema_File(schname);
             vector<int> blocks = Search_Database(temp, name, meta, schema, arr);
-            cout << "Tuples" << endl;
+            int tot = 0;
+            PrintLines(LINEHEIGHT);
+            PrintUnderScore((int)schema.size() * (int)SPACE);
+            PrintSchema(schema);
+            PrintUnderScore((int)schema.size() * (int)SPACE);
             for(int j: blocks){
                 vector<AttributeNode*> tuple = Read_Data_File(name, schema, j / getTupleSize(schema), getTupleSize(schema));
                 PrintTuple(tuple);
+                PrintUnderScore((int)schema.size() * (int)SPACE);
                 FreeTuple(tuple);
+                tot++;
             }
+            PrintLines(LINEHEIGHT);
+            cout << "Total Read " << tot << endl;
+            PrintLines(LINEHEIGHT);
+            free(schname);
+            free(name);
+            free(meta);
+            free(temp);
+        }
+        else if(query[0] == 'd'){
+            string dbname = "";
+            int i = 2;
+            while(i < (int)query.size() && query[i] != ' '){
+                dbname += query[i];
+                i++;
+            }
+            i++;
+            string curr = "";
+            bool t = true;
+            vector<pair<string,string>> arr;
+            while(i < (int)query.size()){
+                if(query[i] == ' '){
+                    if(t) arr.push_back({ curr, "" });
+                    else arr[(int)arr.size() - 1].second = curr;
+                    curr = "";
+                    t = !t;
+                }
+                else curr += query[i];
+                i++;
+            }
+            if((int)arr.size() > 0) arr[(int)arr.size() - 1].second = curr;
+            // for(pair<string, string> p: arr){
+            //     cout << p.first << " " << p.second << endl;
+            // }
+            char* name = (char*) malloc(STRING * sizeof(char));
+            char* db = (char*) malloc(STRING * sizeof(char));
+            char* meta = (char*) malloc(STRING * sizeof(char));
+            char* schname = (char*) malloc(STRING * sizeof(char));
+            strcpy(name, dbname.c_str());
+            strcpy(db, (dbname + ".db").c_str());
+            strcpy(meta, (dbname + ".meta").c_str());
+            strcpy(schname, (dbname + ".schema").c_str());
+            vector<pair<string,string>> schema = Read_Schema_File(schname);
+            int deleted = Delete_In_Database(name, db, meta, schema, arr);
+            PrintLines(LINEHEIGHT);
+            cout << "Deleted " << deleted << " records" << endl;
+            PrintLines(LINEHEIGHT);
+            free(name);
+            free(db);
+            free(meta);
+            free(schname);
+        }
+        else if(query[0] == 'u'){
+            string dbname = "";
+            int i = 2;
+            while(i < (int)query.size() && query[i] != ' '){
+                dbname += query[i];
+                i++;
+            }
+            i++;
+            string curr = "";
+            bool t = true;
+            vector<pair<string,string>> arr, arr1;
+            while(i < (int)query.size() && query[i] != ','){
+                if(query[i] == ' '){
+                    if(t) arr.push_back({ curr, "" });
+                    else arr[(int)arr.size() - 1].second = curr;
+                    curr = "";
+                    t = !t;
+                }
+                else curr += query[i];
+                i++;
+            }
+            if((int)arr.size() > 0) arr[(int)arr.size() - 1].second = curr;
+
+            // for(pair<string, string> p: arr){
+            //     cout << p.first << " " << p.second << endl;
+            // }
+
+            i += 2;
+            t = true;
+            curr = "";
+
+            while(i < (int)query.size() && query[i] != ','){
+                if(query[i] == ' '){
+                    if(t) arr1.push_back({ curr, "" });
+                    else arr1[(int)arr1.size() - 1].second = curr;
+                    curr = "";
+                    t = !t;
+                }
+                else curr += query[i];
+                i++;
+            }
+            if((int)arr1.size() > 0) arr1[(int)arr1.size() - 1].second = curr;
+            for(pair<string, string> p: arr1){
+                cout << p.first << " " << p.second << endl;
+            }
+            char* name = (char*) malloc(STRING * sizeof(char));
+            char* db = (char*) malloc(STRING * sizeof(char));
+            char* meta = (char*) malloc(STRING * sizeof(char));
+            char* schname = (char*) malloc(STRING * sizeof(char));
+            strcpy(name, dbname.c_str());
+            strcpy(db, (dbname + ".db").c_str());
+            strcpy(meta, (dbname + ".meta").c_str());
+            strcpy(schname, (dbname + ".schema").c_str());
+            vector<pair<string,string>> schema = Read_Schema_File(schname);
+            int updated = Update_In_Database(name, db, meta, schema, arr1, arr);
+            PrintLines(LINEHEIGHT);
+            cout << "Updated some records" << endl;
+            PrintLines(LINEHEIGHT);
+            free(name);
+            free(db);
+            free(meta);
+            free(schname);
         }
         else if(query[0] == '8'){
             string dbname = "";
@@ -569,6 +845,9 @@ int main(){
             free(dbbname);
             free(meta);
             free(schname);
+            PrintLines(LINEHEIGHT);
+            cout << "Deleted entire Database" << endl;
+            PrintLines(LINEHEIGHT);
         }
         else if(query[0] == '9'){
             cout << (int)names.size() << endl;
@@ -579,8 +858,16 @@ int main(){
             }
         }
         else if(query[0] == '0'){
-            // test();
-            test1();
+            char* name = (char*) malloc(STRING * sizeof(char));
+            strcpy(name, "Test1.avl");
+            test();
+            // int root = Read_4Bytes_Address(name, 4);
+            // root = Delete_INT_AVLindex(name, root, -1, 3, 1);
+            // Update_Root_Address(name, root);
+            // test1(name);
+            // int root = Read_4Bytes_Address(name, 4);
+            // Update_AVLHeaders(name, root + INTEGER, {10, -1, -1, 10});
+            // inorder(name, root);
         }
         // else if(query[0] == '6'){
         //     char* name = (char*) malloc(STRING * sizeof(char));

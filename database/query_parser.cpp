@@ -3,6 +3,7 @@
 #include <vector>
 #include <set>
 #include <algorithm>
+#include <map>
 using namespace std;
 
 #define CREATE_SCHEMA 1 // not used
@@ -13,7 +14,7 @@ using namespace std;
 
 #define NODEPOINTER 4
 #define BLOCKPOINTER 4
-#define AVLNODESIZE 128
+#define AVLNODESIZE 60   // size of each avl node in disk and RAM
 
 // The three datatypes we decided to use
 const string TYPE1 = "int";
@@ -31,30 +32,29 @@ struct AttributeNode{
     int index;
 };
 
+// The first five attributes of AVLNODE is called headers
 struct AVLNODE{
-    int intkey;
-    char* stringkey;
+    int key;
     int parent;
     int left;
     int right;
-    int size;
-    int index;
     int height;
-    set<int> blocks;
+    set<int> blocks; // this is a set of blocks where tuples are present.
 };
 
-AVLNODE* GetAVLNODE(int intkey, char*stringkey, int parent, int left, int right, 
-                    int size, int index, set<int> blocks){
+#define AVLCACHESIZE 100000
+#define MAXINDEXES 10
+map<pair<int,int>,AVLNODE*> avlnodes;
+// vector<unordered_map<int,AVLNODE*>> avlnodes(MAXINDEXES);
+
+AVLNODE* GetAVLNODE(int key, int parent, int left, int right, set<int> blocks){
     AVLNODE* node = new AVLNODE();
-    node->stringkey = (char*) malloc(STRING * sizeof(char));
     node->parent = parent;
     node->left = left;
     node->right = right;
-    node->size = size;
     node->blocks = blocks;
     node->height = 0;
-    node->intkey = intkey;
-    strcpy(node->stringkey, stringkey);
+    node->key = key;
     return node;
 }
 
